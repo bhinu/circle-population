@@ -1,4 +1,4 @@
-import type { LngLat, QueryResult, SearchHit, StopHit } from "../types";
+import type { LngLat, QueryResult, Stop } from "../types";
 
 async function jsonFetch<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -24,10 +24,10 @@ export function fetchStops(center: LngLat, radiusKm: number) {
     lng: String(center.lng),
     radius: String(radiusKm),
   });
-  return jsonFetch<{ stops: StopHit[] }>(`/api/stops?${params}`);
+  return jsonFetch<{ stops: Stop[] }>(`/api/stops?${params}`);
 }
 
 export function fetchSearch(query: string) {
   const params = new URLSearchParams({ q: query });
-  return jsonFetch<{ hits: SearchHit[] }>(`/api/search?${params}`);
+  return jsonFetch<{ hits: Stop[] }>(`/api/search?${params}`);
 }
