@@ -3,7 +3,6 @@ import { ArrowRight } from "lucide-react";
 import { useAppStore } from "../lib/store";
 import { fetchQuery } from "../lib/api";
 import { fmtNumber } from "../lib/format";
-import type { QueryResult } from "../types";
 
 export function ComparePanel() {
   const pointA = useAppStore((s) => s.pointA);
@@ -129,5 +128,3 @@ function CompareRow({
     </div>
   );
 }
-
-export type _Hidden = QueryResult;
