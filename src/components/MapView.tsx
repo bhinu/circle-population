@@ -9,7 +9,7 @@ import Map, {
   type MapLayerMouseEvent,
 } from "react-map-gl/maplibre";
 import { useAppStore } from "../lib/store";
-import { circlePolygon, inBounds } from "../lib/geo";
+import { circlePolygon, inBounds, NORCAL_MAP_BOUNDS } from "../lib/geo";
 import { fetchStops } from "../lib/api";
 import type { LngLat } from "../types";
 
@@ -60,10 +60,7 @@ export function MapView() {
         latitude: SF_CENTER.lat,
         zoom: 11,
       }}
-      maxBounds={[
-        [-123.8, 36.3],
-        [-120.8, 39.7],
-      ]}
+      maxBounds={NORCAL_MAP_BOUNDS}
       onClick={handleClick}
       cursor={compareMode && pointA && !pointB ? "crosshair" : "pointer"}
       attributionControl={false}
