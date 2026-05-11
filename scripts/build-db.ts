@@ -1,19 +1,5 @@
-/**
- * Build the local SQLite database from raw sources:
- *   1. data/bg_pop.csv         (Census ACS B01003 block-group centroids + pop)
- *   2. data/raw/sfmta.zip      (GTFS — Muni bus + light rail + cable car)
- *   3. data/raw/bart.zip       (GTFS — heavy rail subway/metro)
- *   4. data/raw/caltrain.zip   (GTFS — commuter rail)
- *
- * Output: db/circle.sqlite
- *
- * Schema highlights:
- *   - block_groups      regular table (geoid, lat, lng, pop, county)
- *   - block_groups_rtree  R*Tree spatial index (degenerate bbox per centroid)
- *   - stops             regular table (stop_id, name, lat, lng, category)
- *   - stops_rtree       R*Tree spatial index
- *   - stops_fts         FTS5 contentless index for prefix name search
- */
+// Builds db/circle.sqlite from data/bg_pop.csv + the three GTFS zips in data/raw.
+// See README for schema and source URLs.
 import Database from "better-sqlite3";
 import AdmZip from "adm-zip";
 import { parse } from "csv-parse/sync";
@@ -53,7 +39,7 @@ const COUNTIES: Record<string, string> = {
   "113": "Yolo",
 };
 
-// GTFS route_type → category mapping (route_type 5 cable car & ferry 4 excluded).
+// Cable car (route_type 5) and ferry (4) are intentionally excluded.
 function categorize(routeTypes: Set<number>): "bus" | "tram" | "rail" | null {
   if (routeTypes.has(1) || routeTypes.has(2)) return "rail";
   if (routeTypes.has(0)) return "tram";
@@ -86,11 +72,7 @@ function loadGtfs(zipPath: string) {
   return files;
 }
 
-/**
- * Pull block-group centroids from TIGERweb and population from the Census ACS
- * API. The Census API allows 500 requests/IP/day without a key; supply
- * CENSUS_API_KEY to remove the cap.
- */
+// Census ACS allows 500 unkeyed requests/IP/day; set CENSUS_API_KEY to lift it.
 async function refreshCensus() {
   const key = process.env.CENSUS_API_KEY;
   console.log(`==> Refreshing Census ACS data via API${key ? " (with key)" : " (no key)"}…`);
@@ -118,12 +100,10 @@ async function refreshCensus() {
       bg: header.indexOf("block group"),
     };
 
-    // TIGERweb layer 8 = "Census Block Groups". The ArcGIS server caps results
-    // per query (default 2000), so we paginate with resultOffset until done.
+    // ArcGIS caps results at 2000/query, so paginate with resultOffset.
     const centroids = new Map<string, { lat: number; lng: number }>();
     let offset = 0;
     const PAGE = 2000;
-    // Safety bound: 50 pages = 100k features, well above any county's count.
     for (let page = 0; page < 50; page++) {
       const tigerUrl =
         `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/8/query` +
