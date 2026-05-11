@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/* Mariana Minerals-inspired palette: black / teal / white / blue */
+@theme {
+  --color-bg: #06090b;
+  --color-surface: #0c1316;
+  --color-surface-2: #121d20;
+  --color-border: #1c2a2e;
+  --color-border-strong: #2a3d42;
+  --color-teal: #2dd4bf;
+  --color-teal-dim: #14b8a6;
+  --color-teal-glow: rgba(45, 212, 191, 0.18);
+  --color-blue: #60a5fa;
+  --color-blue-dim: #3b82f6;
+  --color-text: #e6f1f3;
+  --color-text-dim: #8aa2a8;
+  --color-text-mute: #5a6e73;
+  --color-danger: #f87171;
+
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: var(--color-teal-glow);
+    color: var(--color-text);
+  }
+}
+
+@layer components {
+  /* Subtle dotted backdrop on the surface */
+  .surface-grid {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(45, 212, 191, 0.05) 1px, transparent 0);
+    background-size: 16px 16px;
+  }
+
+  .glow-teal {
+    box-shadow:
+      0 0 0 1px var(--color-border-strong),
+      0 8px 24px -8px var(--color-teal-glow);
+  }
+
+  /* MapLibre control restyling to fit dark theme */
+  .maplibregl-ctrl-group {
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  }
+  .maplibregl-ctrl-group button {
+    background-color: transparent !important;
+  }
+  .maplibregl-ctrl-group button + button {
+    border-top: 1px solid var(--color-border) !important;
+  }
+  .maplibregl-ctrl-group button:hover {
+    background-color: var(--color-surface-2) !important;
+  }
+  .maplibregl-ctrl-attrib {
+    background: rgba(12, 19, 22, 0.85) !important;
+    color: var(--color-text-dim) !important;
+  }
+  .maplibregl-ctrl-attrib a {
+    color: var(--color-teal) !important;
+  }
+  .maplibregl-popup-content {
+    background: var(--color-surface) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+  }
+  .maplibregl-popup-tip {
+    border-top-color: var(--color-surface) !important;
+    border-bottom-color: var(--color-surface) !important;
+  }
+}
+
+/* Range slider — restyled */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: var(--color-surface-2);
+  border-radius: 999px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-teal);
+  border: 2px solid var(--color-bg);
+  cursor: pointer;
+  transition: transform 120ms ease;
+  box-shadow: 0 0 0 4px var(--color-teal-glow);
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-teal);
+  border: 2px solid var(--color-bg);
+  cursor: pointer;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-teal-dim);
+}

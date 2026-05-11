@@ -1,0 +1,49 @@
+{
+  "name": "circle-population",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Population & transit-stop counts within a circle on the SF Bay Area map.",
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "vite",
+    "dev:api": "tsx watch server/index.ts",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "download:data": "bash scripts/download-data.sh",
+    "build:db": "tsx scripts/build-db.ts",
+    "data:all": "npm run download:data && npm run build:db",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@tanstack/react-query": "^5.62.0",
+    "better-sqlite3": "^11.7.0",
+    "framer-motion": "^11.13.1",
+    "hono": "^4.6.13",
+    "lucide-react": "^0.468.0",
+    "maplibre-gl": "^4.7.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-map-gl": "^7.1.8",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/adm-zip": "^0.5.8",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "adm-zip": "^0.5.16",
+    "concurrently": "^9.1.0",
+    "csv-parse": "^5.6.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

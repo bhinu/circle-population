@@ -1,0 +1,24 @@
+node_modules
+dist
+.DS_Store
+.env
+.env.local
+
+# Generated DB (built locally via `npm run build:db`)
+db/*.sqlite
+db/*.sqlite-journal
+db/*.sqlite-wal
+db/*.sqlite-shm
+
+# Raw downloaded data: small enough to commit (<10 MB) so the build works
+# offline. To re-pull from upstream, just `rm -rf data/raw` and run download.
+# Uncomment to exclude:
+# data/raw/
+# data/*.zip
+
+# TS incremental build cache
+*.tsbuildinfo
+
+# Editor
+.vscode
+.idea
