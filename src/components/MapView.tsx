@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Map, {
+import MapGL, {
   Layer,
   MapRef,
   Marker,
@@ -11,7 +11,7 @@ import Map, {
 import { useAppStore } from "../lib/store";
 import { circlePolygon, inBounds, NORCAL_MAP_BOUNDS } from "../lib/geo";
 import { fetchStops } from "../lib/api";
-import type { LngLat } from "../types";
+import type { LngLat, Stop } from "../types";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 
@@ -44,15 +44,30 @@ export function MapView() {
     [pointB, radiusKm],
   );
 
-  // Stops in the active (primary) circle, only when toggled on.
-  const stopsQuery = useQuery({
+  // One stops query per circle; the second only fires in Compare Mode.
+  // Stops in the A∩B overlap will appear in both responses and are de-duped
+  // by stop id when merging.
+  const stopsQueryA = useQuery({
     enabled: showStopMarkers && !!pointA,
     queryKey: ["stops", pointA?.lng, pointA?.lat, radiusKm],
     queryFn: () => fetchStops(pointA!, radiusKm),
   });
+  const stopsQueryB = useQuery({
+    enabled: showStopMarkers && compareMode && !!pointB,
+    queryKey: ["stops", pointB?.lng, pointB?.lat, radiusKm],
+    queryFn: () => fetchStops(pointB!, radiusKm),
+  });
+
+  const mergedStops = useMemo<Stop[]>(() => {
+    if (!showStopMarkers) return [];
+    const byId = new Map<string, Stop>();
+    for (const s of stopsQueryA.data?.stops ?? []) byId.set(s.id, s);
+    for (const s of stopsQueryB.data?.stops ?? []) byId.set(s.id, s);
+    return [...byId.values()];
+  }, [showStopMarkers, stopsQueryA.data, stopsQueryB.data]);
 
   return (
-    <Map
+    <MapGL
       ref={mapRef}
       mapStyle={STYLE_URL}
       initialViewState={{
@@ -117,24 +132,23 @@ export function MapView() {
         </Marker>
       )}
 
-      {showStopMarkers &&
-        stopsQuery.data?.stops.map((s) => (
-          <Marker key={s.id} longitude={s.lng} latitude={s.lat} anchor="center">
-            <span
-              title={`${s.name} · ${s.category}`}
-              className="block h-2 w-2 rounded-full ring-2 ring-(--color-bg)"
-              style={{
-                background:
-                  s.category === "rail"
-                    ? "#f87171"
-                    : s.category === "tram"
-                      ? "#fbbf24"
-                      : "#94a3b8",
-              }}
-            />
-          </Marker>
-        ))}
-    </Map>
+      {mergedStops.map((s) => (
+        <Marker key={s.id} longitude={s.lng} latitude={s.lat} anchor="center">
+          <span
+            title={`${s.name} · ${s.category}`}
+            className="block h-2 w-2 rounded-full ring-2 ring-(--color-bg)"
+            style={{
+              background:
+                s.category === "rail"
+                  ? "#f87171"
+                  : s.category === "tram"
+                    ? "#fbbf24"
+                    : "#94a3b8",
+            }}
+          />
+        </Marker>
+      ))}
+    </MapGL>
   );
 }
 
