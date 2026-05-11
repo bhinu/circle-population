@@ -1,159 +1,139 @@
-# Circle Population — SF Bay Area
+# Circle Population: SF Bay Area
 
-Click a point on the map, pick a radius, and instantly see the estimated population and the number of bus / tram / rail stops inside that circle. Inspired by Tom Forth's [Population around a point](https://www.tomforth.co.uk/circlepopulations/), scoped to the SF Bay Area and powered by a local SQLite database with proper spatial indexes.
+A take-home for Mariana Minerals. Click a point on a map of the SF Bay Area, get the population and the bus / tram / rail stop counts inside a circle around it. Inspired by Tom Forth's [Population around a point](https://www.tomforth.co.uk/circlepopulations/), but scoped to NorCal and driven by a local SQLite DB instead of a hosted API.
 
 ![Hero](docs/screenshots/01-hero.png)
 
----
-
-## Highlights
-
-- **Sub-millisecond spatial queries** via SQLite **R\*Tree** indexes on both transit stops and Census block-group centroids — not a linear scan.
-- **FTS5 full-text search** on stop names, served as a `⌘K` command palette.
-- **Three real GTFS feeds** ingested and unified: SFMTA (Muni bus + light rail), BART (subway/metro), Caltrain (commuter rail). Stops are de-duplicated against `parent_station` so a multi-platform BART station counts once.
-- **My chosen feature — Compare Mode**: pin two locations side-by-side with a derived **Transit Equity Score** (people per rapid-transit stop). See the rationale below.
-- **Mariana-inspired** dark theme (`black / teal / white / blue`), WebGL vector basemap.
-
-## Stack
-
-| Layer | Choice | Why |
-|---|---|---|
-| Frontend | Vite + React 19 + TypeScript | Fast, modern, ergonomic |
-| Styling | Tailwind CSS v4 (CSS-first theme) | Tokens map cleanly onto the Mariana palette |
-| Map | MapLibre GL JS + `react-map-gl` | WebGL vector tiles, smooth pan/zoom, free OSM-style data via OpenFreeMap |
-| Data fetching | TanStack Query v5 | Caching, loading/error states, request de-dup |
-| Client state | Zustand | Minimal global state for points / radius / modes |
-| Animation | Framer Motion | Subtle panel transitions |
-| Backend | Hono on `@hono/node-server` | Tiny, fast, TS-first |
-| Validation | Zod | Runtime guards on query params |
-| Database | SQLite via `better-sqlite3` | Synchronous, no IO overhead; ships native bindings |
-| Spatial index | SQLite **R\*Tree** module | Built-in, no extension needed |
-| Stop search | SQLite **FTS5** | Built-in, prefix-aware ranking |
-| ETL | `csv-parse` + `adm-zip` + `tsx` | Plain TS scripts, no build step |
-
-## Quick start
+## Running it
 
 ```bash
 git clone <repo>
 cd circle-population
 npm install
-
-# One-shot: fetch data + build DB.
-# The repo already commits the GTFS zips + Census CSV so this works offline.
-npm run build:db        # Generates db/circle.sqlite (~1.6 MB) in ~12 s
-
-# Dev server (Vite on :5173, Hono API on :8787; Vite proxies /api → 8787)
-npm run dev
-# → http://localhost:5173
+npm run build:db   # builds db/circle.sqlite from data/ and data/raw/  (~12s)
+npm run dev        # vite on :5173, hono api on :8787 (proxied through vite)
 ```
 
-That's it. Click the map.
+Open http://localhost:5173. Click somewhere on the map. Drag the radius slider. The rest is in the UI.
 
-### Refreshing the data from upstream
-
-If you want to re-pull the source data:
+The DB build works offline. I committed the source data (`data/bg_pop.csv` plus the three GTFS zips, ~10 MB total) so you don't need a network on first run. If you want to refresh from upstream:
 
 ```bash
-# Re-download GTFS feeds (~9 MB total)
-rm -rf data/raw
-npm run download:data
-
-# Re-pull Census ACS centroids + population via the public no-key API
-# (500 requests/day per IP). Add CENSUS_API_KEY=... to remove the cap.
-rm -f data/bg_pop.csv
-npm run build:db        # auto-refreshes if bg_pop.csv is missing
-# or force a refresh:
-npm run build:db -- --refresh-census
+rm -rf data/raw && npm run download:data    # refetch GTFS feeds
+rm data/bg_pop.csv && npm run build:db      # auto-refreshes Census via the unkeyed API (capped at 500 req/IP/day)
+# Optional: pass CENSUS_API_KEY=... to lift the cap if you have one. No key required by default.
 ```
 
-### Production build
+Production build (Hono serves the static dist + the API on one port):
 
 ```bash
-npm run build && npm start
-# Hono serves both /api and the built static UI on :8787
+npm run build && npm start   # both on :8787
 ```
 
-## Screenshots
+## What I built
 
-**Compare Mode** — drop two pins, see side-by-side metrics and the transit-equity ratio:
+The required UX is there: a dark map of the Bay Area, click-to-place a point, radius slider (3–25 km, default 5), and a panel showing the estimated population and the bus / tram / rail counts inside the circle. The colors come straight off the Mariana Minerals site: near-black background, teal as the primary accent, blue as the secondary, white text.
 
-![Compare](docs/screenshots/02-compare-mode.png)
+For the "one feature of your own choosing," I added **Compare Mode**: pin location A, drop location B somewhere else, see both circles and side-by-side metrics. I picked this because nearly every piece of user feedback I found on similar tools (r/urbanplanning, r/sanfrancisco, the replies under Tom Forth's original) eventually boils down to "let me compare two places." It also gave me an excuse to surface a derived metric I'm calling **Transit Equity Score**, computed as `population / (tram + rail stops)`, i.e. people per rapid-transit stop. Lower is better access. In the demo screenshots, downtown SF works out to ~3,100 people/rapid-stop and the Alameda waterfront to ~22,000. That ~7× gap is a real, recognizable Bay Area story you can see in one click.
 
-**Command Palette** (`⌘K`) — FTS5 search across all transit stop names; jump straight to a known stop:
+There's also a `⌘K` command palette that does prefix search over every transit stop name (FTS5 under the hood). Small QoL thing, motivated by the same forum feedback ("let me type 'Embarcadero' instead of panning").
 
-![Palette](docs/screenshots/03-command-palette.png)
+## The stack
 
-## Data sources
+Frontend is Vite + React 19 + TypeScript, with Tailwind v4 driving the Mariana palette as CSS-first theme tokens. The map is MapLibre GL JS via `react-map-gl`, serving WebGL vector tiles from OpenFreeMap because it doesn't require an API key. TanStack Query handles fetch state, Zustand handles app state, Framer Motion does the panel transitions, Lucide for icons.
 
-| Source | What | URL |
-|---|---|---|
-| US Census ACS 5-yr 2022, table B01003 | Block-group population | [api.census.gov](https://api.census.gov/data/2022/acs/acs5) |
-| US Census TIGERweb | Block-group centroids (CENTLAT/CENTLON) | TIGERweb ACS2022 MapServer, layer 8 |
-| SFMTA Muni GTFS | Bus + light rail (Muni Metro) stops | `https://muni-gtfs.apps.sfmta.com/data/muni_gtfs-current.zip` (canonical per Mobility Database #2886) |
-| BART GTFS | Subway/metro stations | `https://www.bart.gov/dev/schedules/google_transit.zip` |
-| Caltrain GTFS (Trillium-hosted) | Commuter rail stations | `https://data.trilliumtransit.com/gtfs/caltrain-ca-us/caltrain-ca-us.zip` |
-| OpenFreeMap | Vector basemap tiles (no API key) | `https://tiles.openfreemap.org/styles/dark` |
+Backend is Hono on `@hono/node-server` (Express felt like overkill for three endpoints), `better-sqlite3` for the DB (synchronous API = no async overhead, exactly what you want for an in-process DB), and Zod for validating the query params.
 
-Coverage: **12 California counties** — the 9 Bay Area counties + Sacramento, San Joaquin, Yolo. **6,664 block groups**, **3,209 transit stops** (2,836 bus / 293 tram / 80 rail).
+ETL is plain TS scripts run with `tsx`. The only runtime deps are `csv-parse` and `adm-zip`.
 
-## Database schema
+## Where the data comes from
+
+**Population:** US Census **ACS 2022 5-year**, table `B01003` (total population), via the public Census API. The block-group centroids (`CENTLAT` / `CENTLON`) come from a separate TIGERweb endpoint: `tigerWMS_ACS2022/MapServer/8`. The script auto-paginates because TIGER caps responses at 2,000 rows per query and a few of these counties have more block groups than that.
+
+**Transit:** three GTFS feeds:
+
+- **SFMTA** (Muni: bus + Muni Metro light rail): `https://muni-gtfs.apps.sfmta.com/data/muni_gtfs-current.zip`. The "canonical" `gtfs.sfmta.com` URL that's all over the SFMTA docs was actually dead when I tested, so I had to dig through the [Mobility Database](https://mobilitydata.org) catalog to find the current one (entry #2886). The download script falls back to a GCS-hosted Mobility Database mirror if the live URL times out, which it apparently sometimes does.
+- **BART** (subway/metro): `https://www.bart.gov/dev/schedules/google_transit.zip`
+- **Caltrain** (commuter rail), Trillium-hosted snapshot: `https://data.trilliumtransit.com/gtfs/caltrain-ca-us/caltrain-ca-us.zip`
+
+**Basemap tiles:** OpenFreeMap's `dark` style.
+
+Coverage works out to 12 California counties (the nine Bay Area counties plus Sacramento, San Joaquin, and Yolo), which is **6,664 block groups** and **3,209 transit stops** (2,836 bus / 293 tram / 80 rail) in a **1.6 MB** SQLite file.
+
+## Schema
 
 ```
 block_groups        (id, geoid, county, lat, lng, pop)
-block_groups_rtree  R*Tree virtual table over (lat, lng) for fast bbox queries
+block_groups_rtree   R*Tree spatial index, one degenerate-bbox entry per centroid
 
 stops               (id, stop_id, agency, name, lat, lng, category)
-stops_rtree         R*Tree virtual table over (lat, lng)
-stops_fts           FTS5 contentless index on stop name (porter+unicode61 tokenizer)
+stops_rtree          R*Tree spatial index, one entry per stop
+stops_fts            FTS5 (porter + unicode61) over stop names
 ```
 
-**Query pattern** — for a circle (lat, lng, radius_km):
+The spatial query pattern for a circle at `(lat, lng)` with radius `r` km:
 
 1. Compute an equirectangular bbox around the center.
-2. Hit the R\*Tree: `WHERE min_lat ≥ ? AND max_lat ≤ ? AND min_lng ≥ ? AND max_lng ≤ ?`
-3. Refine with **Haversine** distance per candidate row.
+2. Hit the R\*Tree to get candidates whose bboxes fall inside the query bbox.
+3. Filter the candidates with an exact Haversine distance.
 
-This collapses a 6.7k-row table scan into ~10–500 candidates at typical radii, then does the trig in JS. End-to-end query is well under 5 ms on commodity hardware.
+That collapses a full table scan into ~10–500 candidates at typical radii, which is what justifies the R\*Tree's existence in the schema.
 
-## Technical decisions & tradeoffs
+For GTFS categorization I follow `stops → stop_times → trips → routes` to compute the set of `route_type`s that serve each stop, propagate child types up to `parent_station` so BART platforms inherit the route_types of their station, and emit one row per logical station. Mapping:
 
-**Schema & population approximation.** The most defensible "fast & local" approach to population queries is Census ACS block-group **centroids** with R\*Tree-indexed bboxes plus a Haversine refinement. This is far lighter than ingesting a WorldPop GeoTIFF raster (>250 MB just for CA), still indexable in a single SQLite file (1.6 MB), and accurate enough at the 3–25 km radii the brief requires. The known tradeoff: a block-group's population is treated as a point at its centroid, so a 3 km circle that *partially* contains a large outer block group will under- or over-count by that group's pop. For dense areas like SF this is invisible (small groups, many of them); for sprawl it gets noisier. A pragmatic improvement would be partial area-weighting against the block-group polygon, but that needs polygon ingest and clipping — out of scope for ~2–3 hours. Stops are de-duplicated via `parent_station` so a BART station with multiple platforms counts as one stop, but a Muni surface light-rail line that has a separate `stop_id` for each block (no parent) still counts each platform — I left that "raw" rather than spatially clustering, because the user-facing number ("tram stops within X km") matches how the agency itself reports its network.
+- `1` or `2` → **rail** (BART, Caltrain)
+- `0` → **tram** (Muni Metro light rail)
+- `3` or `11` → **bus** (regular + trolleybus)
+- `4` (ferry) and `5` (cable car) are intentionally excluded. They're real transit but don't fit the brief's three buckets cleanly.
 
-**Why Compare Mode as the custom feature.** Skimming r/urbanplanning, r/sanfrancisco housing threads, and the comments under Tom Forth's tool, the single most recurring ask is *"can I compare two places?"* — real-estate buyers want to weigh neighborhoods, policy folks want to surface inequity, and urbanists want quick visual proof of transit gaps. So Compare Mode lets a user pin location A (teal solid), drop B (blue dashed), and see both panels plus a derived **Transit Equity Score** = `population / (tram_stops + rail_stops)`, i.e. people per rapid-transit stop. Lower is better access. In the demo screenshots, downtown SF clocks ~3,100 people/rapid-stop while the Alameda waterfront clocks ~22,000 — a ~7× gap that surfaces a real, recognizable Bay Area transit-equity story in one click. The `⌘K` command palette (a Cmd-K stop search backed by FTS5) is a smaller bonus, motivated by the same forum feedback ("let me jump to a stop I already know about"). I considered isochrones, demographics breakdowns, and a shareable URL state — all interesting, but Compare Mode was the highest-signal feature I could ship cleanly in the time budget.
+## Tradeoffs
 
-## Known limitations
+**Centroid-based population.** I treat each block group's population as a point at its centroid and ask "is the centroid inside the circle?" This is fast and small (the whole DB is 1.6 MB), but it's lossy at the edges: a 3 km circle that partially overlaps a large outer Marin block group will either take all of its pop or none, with nothing in between. For dense areas like SF the groups are small enough that this error is invisible; for sprawl, it grows. The cleaner answer is polygon-area-weighted population, which means ingesting the actual block-group shapefiles and using something like `@turf/intersect`. That would roughly 5× the DB size and bump query times from sub-millisecond to ~10 ms, so I chose to flag the limitation here rather than implement it. If I had another half-day on this, that's the first thing I'd do.
 
-- **Cable cars** (GTFS `route_type = 5`) and **ferries** (`route_type = 4`) are not counted. They don't fit cleanly into bus/tram/rail.
-- **East Bay buses** (AC Transit, etc.), VTA light rail, and SamTrans are not ingested — only SFMTA / BART / Caltrain. Easy to add by extending `feeds` in `scripts/build-db.ts`.
-- The "Area" label is the county containing the closest block-group centroid, not a true reverse-geocode (no city / neighborhood resolution).
-- The bbox-then-Haversine approach over-includes by up to ~1.5% at the bbox corners; the Haversine pass corrects that exactly.
+**Equirectangular bbox.** Same reasoning. For 25 km circles at SF latitudes (~37.8°), the difference between a true geodesic bbox and a flat-earth approximation is a fraction of a degree, and the Haversine refinement corrects any over-inclusion exactly. At higher latitudes or much larger radii this would degrade.
 
-## Project layout
+**Stop de-duplication.** I dedup by `parent_station`, so a BART station with several platform `stop_id`s counts once. Muni surface light-rail stops mostly don't have parents (they're registered per block), so I left those as the agency declares them. The reasoning: the user-facing "tram stops within X km" should match what SFMTA itself reports about its own network, not some clustered abstraction.
+
+## Known gaps
+
+These are all permitted under the brief's "reasonable simplifications," but they're real and I'd want to fix them in v2:
+
+- East Bay (AC Transit), Peninsula (SamTrans), and South Bay (VTA: bus + light rail) aren't ingested. A pin in Oakland correctly returns zero buses, but it visually reads as a bug for about three seconds before you realize it's a coverage gap. Adding those is roughly 10 minutes of work (append to the `feeds` array in `scripts/build-db.ts` and rerun) plus another ~20 MB of GTFS data.
+- The "Area" label is just the county containing the closest block-group centroid. A pin in the Mission says "San Francisco," not "Mission District." A real reverse-geocode against TIGER place polygons would fix this.
+- No URL persistence. Refreshing nukes both pins. `?a=lat,lng&b=lat,lng&r=5` would be the obvious next thing, and would make compare-mode results shareable.
+- The Stops overlay caps at 2,000 markers per circle to keep the payload light. At 25 km radius in dense SF you can hit that cap silently.
+
+## Layout
 
 ```
 .
 ├── data/
 │   ├── bg_pop.csv          # Census block-group centroids + pop (committed)
 │   └── raw/                # GTFS zips (committed, ~9 MB)
-├── db/                     # Generated SQLite (.gitignored)
-├── docs/screenshots/       # Screenshots used in this README
+├── db/                     # generated; .gitignored
+├── docs/screenshots/
 ├── scripts/
-│   ├── download-data.sh    # Pulls GTFS feeds from upstream
-│   └── build-db.ts         # ETL → SQLite with R*Tree + FTS5
+│   ├── download-data.sh    # fetches GTFS zips
+│   └── build-db.ts         # ETL → db/circle.sqlite
 ├── server/
-│   ├── db.ts               # SQLite open + geo helpers
-│   └── index.ts            # Hono API (/api/query, /api/stops, /api/search)
+│   ├── db.ts               # sqlite open + geo helpers
+│   └── index.ts            # Hono /api/query, /api/stops, /api/search
 └── src/
     ├── App.tsx
-    ├── components/
-    │   ├── MapView.tsx
-    │   ├── ControlBar.tsx
-    │   ├── ResultsPanel.tsx
-    │   ├── ComparePanel.tsx
-    │   └── CommandPalette.tsx
-    └── lib/                # store, api, geo, format
+    ├── components/         # MapView, ControlBar, ResultsPanel, ComparePanel, CommandPalette
+    └── lib/                # store / api / geo / format
 ```
+
+## Screenshots
+
+**Compare Mode**: two pins, side-by-side metrics, transit-equity ratio at the bottom of the third panel:
+
+![Compare](docs/screenshots/02-compare-mode.png)
+
+**Command palette** (`⌘K`). FTS5 prefix search across every transit stop. Rail stops are red, tram yellow, bus grey:
+
+![Palette](docs/screenshots/03-command-palette.png)
 
 ## License
 
-MIT for code. All transit and Census data are publicly licensed under their respective terms (CC0 / public-domain / GTFS Open Data).
+Code is MIT. The data sources keep their respective open-data licenses (Census is public-domain; GTFS feeds are each agency's terms, all permissive).
